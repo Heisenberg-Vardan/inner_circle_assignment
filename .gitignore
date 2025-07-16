@@ -5,8 +5,6 @@ __pycache__/
 models/
 recommender_module/models/
 *.db
-.env
-*.env
 .ipynb_checkpoints/
 *.log
 *.csv
