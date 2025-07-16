@@ -1,0 +1,13 @@
+__pycache__/
+**/__pycache__/
+*.pkl
+*.joblib
+models/
+recommender_module/models/
+*.db
+.env
+*.env
+.ipynb_checkpoints/
+*.log
+*.csv
+

@@ -1,36 +1,44 @@
-import pandas as pd
-import os
-import joblib
-
+import argparse
 from src.trainer import UserRecommenderTrainer
 from src.recommender import UserRecommender
-from src.persistence import save_model, load_model
+from src.utils import (
+    load_data, ensure_models, visualize_top_recommendations, get_env_variable
+)
 
-# Load CSVs
-users_df = pd.read_csv("data/users.csv")
-interactions_df = pd.read_csv("data/activity.csv")
+def main():
+    parser = argparse.ArgumentParser(description="User Recommendation Engine")
+    parser.add_argument('--user_id', '-u', type=int, required=True, help='User ID for recommendations')
+    parser.add_argument('--show', type=int, default=5, help='Number of recommendations to visualize (default: 5)')
+    args = parser.parse_args()
 
-# Load model if exists
-model_path = "models/xgb_model.pkl"
-preprocessor_path = "models/preprocessor.pkl"
+    users_path = get_env_variable('USERS_PATH')
+    interactions_path = get_env_variable('INTERACTIONS_PATH')
+    model_path = get_env_variable('MODEL_PATH')
+    preprocessor_path = get_env_variable('PREPROCESSOR_PATH')
+    tfidf_path = get_env_variable('TFIDF_PATH', default='tfidf.joblib')
 
-if os.path.exists(model_path) and os.path.exists(preprocessor_path):
-    print("✅ Loading existing model...")
-    model, preprocessor = load_model(model_path, preprocessor_path)
-else:
-    print("🧠 No model found. Starting training...")
-    trainer = UserRecommenderTrainer(users_df, interactions_df)
-    model, preprocessor = trainer.train()
-    save_model(model, preprocessor, model_path, preprocessor_path)
+    users_df, interactions_df = load_data(users_path, interactions_path)
+    model, preprocessor = ensure_models(
+        users_df, interactions_df, model_path, preprocessor_path, UserRecommenderTrainer
+    )
 
-# Instantiate recommender
-recommender = UserRecommender(users_df, interactions_df, model, preprocessor)
+    import joblib
+    tfidf = joblib.load(tfidf_path)
 
-# Example recommendation
-user_id_to_recommend = users_df['user_id'].iloc[2]
-recommendations = recommender.recommend_users(user_id_to_recommend, k=5)
+    recommender = UserRecommender(users_df, interactions_df, model, preprocessor, tfidf)
 
-print(f"\n📌 Top 5 recommendations for user {user_id_to_recommend}:")
-for i, (uid, reason) in enumerate(recommendations):
-    print(f"{i+1}. User {uid} - {reason}")
+    summary = recommender.summarize_user_history(args.user_id)
+    print("📍 City openness:", summary["city_openness"])
+    print("⚧️ Orientation:", summary["orientation"])
+    print("🎂 Age preference:", summary["age_preference"])
 
+
+    recommendations = recommender.recommend_users(args.user_id, k=10)
+    print(f"\n📌 Top {args.show} recommendations for user {args.user_id}:")
+    for i, (uid, reason) in enumerate(recommendations[:args.show]):
+        print(f"{i+1}. User {uid} - {reason}")
+
+    visualize_top_recommendations(users_df, recommendations, args.user_id, n_show=args.show)
+
+if __name__ == "__main__":
+    main()
